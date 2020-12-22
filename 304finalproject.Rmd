@@ -1,0 +1,235 @@
+---
+title: "Study of 2019 Canadian federal election"
+author: "Jiarong Ye"
+date: "12/18/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Abstract
+
+The 2019 Canadian federal election is predicted in this report. However, Immigration is a major part of the Canadian population, they played important role in Canada's economy, but they are not allow to vote unless they obtain Canadian citizenship. In this report it will deeply analyze how permanents would affect the final result of 2019 Canadian federal election if they have to right to vote. The terminologies that would be used in this report in order to help us to analyze the data are logistic regression model and  Post-Stratification. 
+
+Keywords: Logistic regression model, Post-Stratification, Permanent residents
+
+
+# Introduction
+
+The 2019 Canadian federal election was held on October 21, 2019. In result, Liberal party has popular vote 6,018,728 and 33.12% of total vote. Conservative party however has popular vote 6,239,227 and 34.34% of the total vote. It is obvious that this time Liberal party lost to Conservative party, which marks only the second time in Canadian history that a governing party formed a government while receiving less than 35 per cent of the national popular vote. The Liberals received the lowest percentage of the national popular vote of a governing party in Canadian history.
+
+However, not everyone from Canada had voted. Some people might forgot to vote, or they chose to not vote. There is another group of people, they live and work in Canada just like any other Canadians. They are permanent residents but they are not allowed to vote. In this report, the issue, would the 2019 Canadian federal election be different if everyone in the Canada had voted including all the permanent residents, will be investigated.
+
+In this report, I will be also analyzing how people's education, age and province would affect their vote choice. Since people in different education and age might have different thoughts on politics. People from different province have different preference in parties. This is based on what benefits the party have brought or will bring to the province. 
+
+I will use logistic regression model and Post-Stratification to show my prediction of the vote result. Logistic regression model is used to describe data and to explain the relationship between one dependent binary variable and one or more nominal, ordinal, interval or ratio-level independent variables. Post-Stratification then Post-stratification is a common technique in survey analysis for incorporating population distributions of variables into survey estimates.
+
+
+# Data
+
+The survey data used in this project is from 2019 Canadian Election Study website. It is a reliable source because throughout its long history, the CES has been a rich source of data on Canadian's political behavior and attitude. The leader of 2019 Canadian Election Study are Laura Stephenson, Allison Harell, Daniel Rubenson and Peter Loewen. They are all really professional at the election study. The data is online survey based data and has total sample size of 37,822. The online survey was conducted to document the attitudes of Canadians during and after the 2019 election. The target population includes all ages (18-year-old above) of Canadians and permanent residents across all provinces in Canada. 
+
+The census data is the highest level of educational attainment (general) by sex and selected age groups in 2016. It is from Statistics Canada, it is the national statistical office that ensures Canadians have the key information on Canada's economy, society and environment that they require to function effectively as citizens and decision makers. The targeted population are all 15 years old and over people for both sexes across Canada.
+
+In order to perform Post-Stratification, it is necessary to keep all the variable names from both survey data and census data the same. The topic of the project is focused on both Canadians citizens and permanent residents, thus in survey data vote choice for both groups of people are combined together. The survey data only shows which year the person was bored but the census data shows the age range. In order to keep them same, the year from survey data is converted to the age range it belonged to. However, the minimum age range included in census data is from 25 to 34. Therefore, the survey data could not include people from 18 years old to 24 years old then cases with age from 18 years old to 24 years old were eliminated.
+
+
+# Model
+
+
+## Model Specifics
+
+I will be using two logistic regression models to model the proportion of voters. One logistic regression model will show who will vote for Liberal Party and another logistic regression model will show who will vote for  Conservative party. The reason why the logistic regression model is used because the Y variable is binary meaning either vote for the one of the Liberal or conservative party or not. In one model, value 1 represents vote for Liberal party and value 0 represents not vote for Liberal party. Then in another model, value 1 represents vote for Conservative party and value 0 represents not vote for Conservative party. I will be using age range, gender, province and their education level to model the probability of voting for Liberal or Conservative party. 
+
+The logistic regression model I am using for both parties is:
+$$ log(\frac{p}{1-p}) = \beta_0+\beta_1x_{Age35-44} + \beta_2x_{Age45-54} +...+ \beta_4x_{Female} + \beta_5x_{BC} + \beta_6x_{MB}+...+\beta_{17}x_{highschool}+\beta_{18}x_{college}+...+\epsilon$$
+p represents the probability of the event of interest occurring, here it refers to the probability that everyone in Canada inluding permanant residents will vote for Liberal or conservative party in 2019. Similarly, $\beta_0$ represents the intercept of the model, and is the probability of voting for Liberal or conservative party for male people in age 25-34 from Alberta who do not own any diploma. 
+
+
+
+
+```{r,echo=FALSE, include=FALSE}
+library(labelled)
+library(haven)
+ces2019_web=read_dta("/Users/3255761/Desktop/304_final/ces2019_web.dta")
+ces2019_web_1 <- to_factor(ces2019_web) 
+head(ces2019_web_1)
+```
+
+
+```{r, echo=FALSE, include=FALSE}
+library(tidyverse)
+census <- read_csv("/Users/3255761/Desktop/304_final/98-402-X2016010-T1-CANPR-eng.csv")
+edu_count<-c("Total - Highest certificate, diploma or degree (2016 counts)"
+,"No certificate, diploma or degree (2016 counts)"
+,"Secondary (high) school diploma or equivalency certificate (2016 counts)"
+,"Apprenticeship or trades certificate or diploma (2016 counts)"
+,"College, CEGEP or other non-university certificate or diploma (2016 counts)"
+,"University certificate or diploma below bachelor level (2016 counts)"
+,"University certificate, diploma or degree at bachelor level or above (2016 counts)")
+census_cleaned<-census %>% select(c("Age","Sex",edu_count, "Geographic name"))%>% pivot_longer(cols=edu_count,
+names_to='education',values_to="count")
+census_cleaned <-
+  census_cleaned %>%
+  filter(Age!="All ages, 15-plus") %>%
+  filter(`Geographic name`!="Canada") %>%
+  filter(Sex != "Both sexes") %>%
+  filter(Age != "25 to 64") %>%
+  filter(education != "Apprenticeship or trades certificate or diploma (2016 counts)")%>%
+  filter(education != "Total - Highest certificate, diploma or degree (2016 counts)")%>%
+  rename(Province  = `Geographic name`)
+census_cleaned$education <- recode(census_cleaned$education, "No certificate, diploma or degree (2016 counts)" = "No certificate, diploma or degree")
+
+census_cleaned$education <- recode(census_cleaned$education, "Secondary (high) school diploma or equivalency certificate (2016 counts)" = "Secondary (high) school diploma or equivalency certificate")
+
+census_cleaned$education <- recode(census_cleaned$education, "College, CEGEP or other non-university certificate or diploma (2016 counts)"="College, CEGEP or other non-university certificate or diploma")
+
+census_cleaned$education <- recode(census_cleaned$education, "University certificate or diploma below bachelor level (2016 counts)" = "University certificate or diploma below bachelor level")
+
+census_cleaned$education <- recode(census_cleaned$education, "University certificate, diploma or degree at bachelor level or above (2016 counts)" = "University certificate, diploma or degree at bachelor level or above")
+
+
+                                   
+
+
+```
+
+```{r, echo=FALSE, include=FALSE}
+reduced_survey<-
+  ces2019_web_1 %>%
+  select(cps19_citizenship,
+         cps19_yob,
+         cps19_gender,
+         cps19_province,
+         cps19_education,
+         cps19_votechoice,
+         cps19_votechoice_pr)
+reduced_survey$cps19_votechoice = as.character(reduced_survey$cps19_votechoice)
+reduced_survey$cps19_votechoice_pr = as.character(reduced_survey$cps19_votechoice_pr)
+reduced_survey$cps19_votechoice = ifelse(!(is.na(reduced_survey$cps19_votechoice)), reduced_survey$cps19_votechoice, reduced_survey$cps19_votechoice_pr)
+reduced_survey<-
+  reduced_survey%>%
+  rename(cps19_votechoice_total = cps19_votechoice)%>%
+  filter(cps19_votechoice_total != "Another party (please specify)")%>%
+  filter(cps19_votechoice_total != "Don't know/ Prefer not to answer")%>%
+  filter(cps19_gender != "Other (e.g. Trans, non-binary, two-spirit, gender-queer)")%>%
+  filter(cps19_education != "Don't know/ Prefer not to answer")%>%
+  rename(Sex = cps19_gender) %>%
+  rename(Province  = cps19_province) %>%
+  rename(Age = cps19_yob)%>%
+  rename(education = cps19_education)%>%
+  mutate(vote_liberal = 
+           ifelse(cps19_votechoice_total=="Liberal Party", 1, 0))%>%
+  mutate(vote_conservative = 
+           ifelse(cps19_votechoice_total=="Conservative Party", 1, 0))
+  
+
+reduced_survey$Sex <- recode(reduced_survey$Sex, "A woman"="Female", "A man"="Male")
+reduced_survey$education <- recode(reduced_survey$education, "No schooling" = "No certificate, diploma or degree")
+reduced_survey$education <- recode(reduced_survey$education, "Completed secondary/ high school" ="Secondary (high) school diploma or equivalency certificate")
+reduced_survey$education <- recode(reduced_survey$education, "Some university" = "University certificate or diploma below bachelor level")
+reduced_survey$education <- recode(reduced_survey$education, "Bachelor's degree" = "University certificate, diploma or degree at bachelor level or above")
+reduced_survey$education <- recode(reduced_survey$education, "Completed technical, community college, CEGEP, College Classique" = "College, CEGEP or other non-university certificate or diploma")
+reduced_survey$education <- recode(reduced_survey$education, "Master's degree" = "University certificate, diploma or degree at bachelor level or above")
+reduced_survey$education <- recode(reduced_survey$education, "Professional degree or doctorate" = "University certificate, diploma or degree at bachelor level or above")
+reduced_survey$education <- recode(reduced_survey$education, "Some technical, community college, CEGEP, College Classique"="College, CEGEP or other non-university certificate or diploma")
+reduced_survey$education <- recode(reduced_survey$education, "Some secondary/ high school" = "Secondary (high) school diploma or equivalency certificate")
+reduced_survey$education <- recode(reduced_survey$education, "Some elementary school" = "No certificate, diploma or degree")
+reduced_survey$education <- recode(reduced_survey$education, "Completed elementary school" = "No certificate, diploma or degree")
+
+  
+reduced_survey<-
+  reduced_survey%>%
+  filter(Age != "2001")%>%
+  filter(Age != "2000")%>%
+  filter(Age != "1999")%>%
+  filter(Age != "1998")%>%
+  filter(Age != "1996")%>%
+  filter(Age != "1995")
+
+reduced_survey$Age <- as.numeric(as.character(reduced_survey$Age))
+
+reduced_survey$Age<-ifelse(reduced_survey$Age >= 1985&reduced_survey$Age<=1994, "25 to 34", ifelse(reduced_survey$Age >= 1975&reduced_survey$Age<=1984, "35 to 44", ifelse(reduced_survey$Age >= 1965&reduced_survey$Age<=1974,"45 to 54", "55 to 64")))
+
+
+
+
+```
+Model1: the logistic regression model for probability of people will vote for liberal party:
+
+```{r, echo=FALSE}
+model <- glm(vote_liberal ~ Age + Sex + Province + education, 
+            data=reduced_survey, family="binomial")
+summary(model)
+```
+
+
+Model2: logistic regression model for probability of people will vote for conservative party:
+
+```{r, echo=FALSE}
+model_1 <- glm(vote_conservative ~ Age + Sex + Province + education, 
+            data=reduced_survey, family="binomial")
+summary(model_1)
+```
+
+
+## Post-Stratification 
+The final prediction of probability of everyone in Canada (including permanent residents) voting for Liberal party by Post-Stratification method:
+```{r, echo=FALSE}
+# Here I will perform the post-stratification calculation
+census_cleaned$estimate <-
+  model %>%
+  predict(newdata = census_cleaned, type = "response")
+glimpse(census_cleaned)
+census_cleaned %>% 
+  mutate(alp_predict_prop = estimate*count) %>%
+  summarise(alp_predict = sum(alp_predict_prop)/sum(count))
+```
+
+The final prediction of probability of everyone in Canada (including permanent residents) voting for conservative party by Post-Stratification method:
+```{r, echo=FALSE}
+# Here I will perform the post-stratification calculation
+census_cleaned$estimate <-
+  model_1 %>%
+  predict(newdata = census_cleaned, type = "response")
+glimpse(census_cleaned)
+census_cleaned %>% 
+  mutate(alp_predict_prop = estimate*count) %>%
+  summarise(alp_predict = sum(alp_predict_prop)/sum(count))
+```
+
+
+# Results
+
+Below is how Model1: the logistic regression model for probability of people will vote for liberal party could be expressed:
+$$ log(\frac{p}{1-p}) = -1.7364+0.0927x_{Age35-44} +...+ 0.1231x_{Female} + 0.7497x_{BC} +...-0.3443x_{highschool}+...+\epsilon$$
+$\hat{\beta0}$ here is -1.1736. It is also a log of odds when all the x values are zero. All predictor variables here are categorical. The positive coefficient of $x_{Age35-44}$ is 0.0927, it means that holding all other explanatory variables in the model fixed, person who is in age 35 to 44 has in average 0.0927 more possibility of voting for Liberal party than person who is in age 25 to 34. Comparing all the age ranges, ages from 55 to 64 has the biggest positive coefficient, it implies that 55 to 64 years old people have the most possibility to vote for Liberal party. The positive coefficient of $x_{Female}$ is 0.1231, meaning holding all other explanatory variables in the model fixed, female person has in average 0.1231 more possibility of voting for Liberal party than male person. 0.7497 is a coefficient for $x_{BC}$. Person who is from British Columbia has in average 0.7497 more possibility of voting for Liberal party than person who from Alberta. Looking at other provinces, -0.2173 is the coefficient for Saskatchewan. It tells us that Person from Saskatchewan would have in average -0.2173 less possibility of voting for Liberal party than person who is from Alberta. Saskatchewan is also the only province with negative coefficient, thus people in Saskatchewan have the least voting rate to Liberal party among other provinces. Meanwhile, Newfoundland and Labrador has the biggest positive coefficient, 1.5423. It implies that Liberal party is most popular in Newfoundland and Labrador. Now let move on how education level could affect the possibility that person would vote for Liberal party. -0.3443 is the coefficient for person with high school diploma. Person whose highest education level is high school would have in average 0.3443 less possibility of voting for Liberal party than person who achieves no certificate or diploma. It is also the smallest coefficient comparing to other education level coefficients meaning people whose highest educational attainment is high school diploma would have the lowest possibility to choose Liberal party. However, people with university certificate have the biggest coefficient, 0.3494 among other educational attainments. Therefore, people with university certificate are most willing to choose for Liberal party. Now, logistic model is used to do Post-Stratification by taking advantage of demographics to extrapolate how entire population will vote. The table shows that it partition the census data into demographic cells. Each cell is a demographic to a unique combination of gender, province, age and educational attainment. Each cell also includes the estimate response variable, the probability of Liberal party being chosen calculated by the logistic model introduced previously. How could we get the final prediction by Post-Stratification? We first use estimate of each cell times its corresponding population size and then take the sum of the value from every single one of the cell, lastly divide it by the entire population size. Here $\hat{y}^{ps}=0.3282$. The prediction of probability of Liberal party being chosen in entire population size is 32.82%.
+
+Now let's see Model2: logistic regression model for probability of people will vote for Conservative party.
+It could expressed as:
+$$ log(\frac{p}{1-p}) = 0.2711+0.2864x_{Age35-44} +...-0.3991x_{Female} -1.3838x_{BC} +...+0.4124x_{highschool}+...+\epsilon$$
+In conclusion, 55 to 64 years old female people from Alberta whose highest educational attainment is high school diploma would have the greatest possibility of choosing Conservative party. However, 25 to 34 years old male people from Northwest Territories whose highest educational attainment is university diploma would have the lowest possibility of choosing Conservative party. After the Post-Stratification is done, the prediction of probability of Conservative party being chosen in entire population size is 33.14%.
+
+
+# Discussion
+
+I did data cleaning process for both survey and census data. I then created logistic regression model by using the survey data for both Liberal and Conservative parties. The two models is used to see the how could variables affect the probability of Liberal and Conservative parties being chosen. After, the Post-Stratification is started, the census data was divided into many demographic cell and each cell contains estimate response variable calculated based on the logistic regression model. Lastly, after some calculation the probability of Conservative parties being chosend in the entire population size is predicted.
+
+By using Post-Stratification method, prediction of probability of Liberal and Conservative party being chosen is calculated, which are 32.82% and 33.14%. Compare to the official final percentage 33.12% and 34.34% published by Canadian government, the prediction percentage is very close to the final percentage. Overall, both Liberal and Conservative party percentage predictions are a little bit lower than the final percentage. If we disregard all the error made in the prediction, it could tell that most of the permanent residents would like to vote for other parties except for Liberal and Conservative party. The difference between the prediction and final percentages for both parties are: 33.12%-32.82%=0.3% (Liberal Party) and 34.34%-33.14%=1.2% (Conservative Party). The difference for Liberal party is relatively smaller than Conservative Party, thus permanent residents are more likely to choose Liberal than Conservative. This is not surprising because permanent residents in Canada are immigrants from all over the world. The leader of Liberal Party, Justin Trudeau has brought many immigrants and refugees to the country, Trudeau always wants Canada to be a multicultural Country and offers many benefits to the refugees and immigrants. 
+
+
+## Weakness
+
+The biggest obstacle in the data cleaning process is that both data come from different years. The survey data is from 2019 but the census data is from 2016. The gap between 2019 and 2016 is 3 years and during these 3 years many things could be changed, like population, people's perspectives and so on. Therefore, the prediction generated by Post-Stratification would not that accurate. In this report we assume all permanent residents and Canadian citizens are allowed to vote. However, the census data we used includes Canadian citizens, landed immigrants (permanent residents) and non-permanent residents and their families living with them in Canada. It includes extra groups of people in the census people which would lead to inaccurate result by Post-Stratification. The census data only includes people from age 25 to 64. It does not include people from age 18 to 24 and 65 and above. The census data only included age range but not specific age, the age range is a categorical variable in this project. If the census data includes specific ages, the age would be a discrete predictor variable and would show specifically age in one year difference could affect the probability of choosing certain party.
+
+
+## Preference
+
+Clarke, Seán, and Cath Levett. “Canada Election 2019: Full Results.” The Guardian, Guardian News and Media, 23 Oct. 2019, www.theguardian.com/world/2019/oct/22/canada-election-2019-full-results. 
+
+Swaminathan, Saishruthi. “Logistic Regression - Detailed Overview.” Medium, Towards Data Science, 18 Jan. 2019, towardsdatascience.com/logistic-regression-detailed-overview-46c4da4303bc. 
+
+Little, R. J. A. Post-Stratification: A Modeler's Perspective. 
+
+
+
